@@ -50,9 +50,10 @@ public class Recorder extends Activity implements OnClickListener {
 		recordButton = (ImageButton) findViewById(R.id.imageButton1);
 		recordButton.setOnClickListener(this);
 		isRunning = false;
+		setupVisualizerFxAndUI();
+		
 	}
 
-	@Override
 	public void onClick(View v) {
 		Log.d(TAG, "onClick: " + v);
 		if (isRunning) {
@@ -69,7 +70,6 @@ public class Recorder extends Activity implements OnClickListener {
 		Toast.makeText(this, "recording started", Toast.LENGTH_LONG).show();
 		Thread thread = new Thread(new Runnable() {
 			public void run() {
-				setupVisualizerFxAndUI();
 				mVisualizer.setEnabled(true);
 				Log.d("AudioStream", "Recording" );
 				while (isRunning) { 
