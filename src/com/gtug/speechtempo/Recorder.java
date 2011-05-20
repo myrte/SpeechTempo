@@ -1,5 +1,7 @@
 package com.gtug.speechtempo;
 
+import java.util.ArrayList;
+
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -49,8 +51,8 @@ public class Recorder extends Activity implements OnClickListener {
 		setContentView(R.layout.main);
 		recordButton = (ImageButton) findViewById(R.id.imageButton1);
 		recordButton.setOnClickListener(this);
-		isRunning = false;
 		setupVisualizerFxAndUI();
+		isRunning = false;
 		
 	}
 
@@ -64,19 +66,23 @@ public class Recorder extends Activity implements OnClickListener {
 	}
 
 	public void record() {
+		
 		isRunning = true;
 		audioRecord.startRecording();
 		audioTrack.play();
+		
 		Toast.makeText(this, "recording started", Toast.LENGTH_LONG).show();
+		
 		Thread thread = new Thread(new Runnable() {
+			
 			public void run() {
-				mVisualizer.setEnabled(true);
 				Log.d("AudioStream", "Recording" );
-				while (isRunning) { 
+				mVisualizer.setEnabled(true);
+				while (isRunning) {
+					
 					byte[] buffer = new byte[recordBufferSize];
-					int bufferReadResult = audioRecord
-							.read(buffer, 0, recordBufferSize);
-					audioTrack.write(buffer, 0, bufferReadResult);
+					int bufferReadResult = audioRecord.read(buffer, 0, recordBufferSize);
+					audioTrack.write(buffer, 0, bufferReadResult);					
 				}
 			}
 		});
@@ -100,9 +106,22 @@ public class Recorder extends Activity implements OnClickListener {
 		mVisualizer.setCaptureSize(Visualizer.getCaptureSizeRange()[1]);
 		mVisualizer.setDataCaptureListener(
 				new Visualizer.OnDataCaptureListener() {
+					
+					private long past_time = 0;
+					private long wait_time = 5000;
+					private long time = 5000;
+					
 					public void onWaveFormDataCapture(Visualizer visualizer,
 							byte[] bytes, int samplingRate) {
-						mVisualizerView.updateVisualizer(bytes);
+					
+							if(time > wait_time && isRunning){
+								time = 0;
+								past_time = System.currentTimeMillis();
+								mVisualizerView.updateVisualizer(bytes);
+							}else{
+								time = System.currentTimeMillis()-past_time;
+							}
+						
 					}
 
 					public void onFftDataCapture(Visualizer visualizer,
@@ -119,23 +138,38 @@ public class Recorder extends Activity implements OnClickListener {
  */
 class VisualizerView extends View {
 	
+	final private static int sampring_max = 100;
+	
+	private ArrayList<byte[]> savewave;
+	private byte[] mBytes;
+	private float[] mPoints;
+	private Rect mRect = new Rect();
+	private Paint mForePaint = new Paint();
+	private int view_width, view_height;
+	private int digree = 0;
+	private int digree_sum = 0;
 	public VisualizerView(Context context, AttributeSet attrs) {   
 	    super(context, attrs);  
 	    init();
 	}
-	
-	private byte[] mBytes;
-	private float[] mPoints;
-	private Rect mRect = new Rect();
 
-	private Paint mForePaint = new Paint();
+	@Override
+	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+		// TODO Auto-generated method stub
+		super.onSizeChanged(w, h, oldw, oldh);
+		view_width = getWidth();
+		view_height = getHeight();
+		
+	}
 
 	private void init() {
+		
 		mBytes = null;
-
 		mForePaint.setStrokeWidth(1f);
 		mForePaint.setAntiAlias(true);
-		mForePaint.setColor(Color.rgb(0, 128, 255));
+		savewave = new ArrayList<byte[]>();
+		//mForePaint.setColor(Color.rgb(0, 128, 255));
+		this.setBackgroundColor(Color.WHITE);
 	}
 
 	public void updateVisualizer(byte[] bytes) {
@@ -146,27 +180,24 @@ class VisualizerView extends View {
 	@Override
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
-
+		
 		if (mBytes == null) {
 			return;
-		}
-
-		if (mPoints == null || mPoints.length < mBytes.length * 4) {
-			mPoints = new float[mBytes.length * 4];
-		}
-
-		mRect.set(0, 0, getWidth(), getHeight());
-
-		for (int i = 0; i < mBytes.length - 1; i++) {
-			mPoints[i * 4] = mRect.width() * i / (mBytes.length - 1);
-			mPoints[i * 4 + 1] = mRect.height() / 2
-					+ ((byte) (mBytes[i] + 128)) * (mRect.height() / 2) / 128;
-			mPoints[i * 4 + 2] = mRect.width() * (i + 1) / (mBytes.length - 1);
-			mPoints[i * 4 + 3] = mRect.height() / 2
-					+ ((byte) (mBytes[i + 1] + 128)) * (mRect.height() / 2)
-					/ 128;
-		}
-
-		canvas.drawLines(mPoints, mForePaint);
+		}	
+		savewave.add(mBytes);
+		for(int i = 0; i < savewave.size(); i++){
+			byte[] drawline = savewave.get(i);
+			digree_sum = 0;
+			for(int j = 0 ; j < sampring_max; j++){
+				int colorvalue = 255 - (128-Math.abs(drawline[j]) * 20);
+				if(colorvalue < 0) colorvalue = 0;
+				mForePaint.setColor(Color.rgb(colorvalue, colorvalue, colorvalue));
+				digree = (view_height - digree_sum) / (sampring_max -j);
+				for(int k =0; k < digree ; k++){
+					canvas.drawPoint(view_width - savewave.size()+i, view_height - digree_sum - k, mForePaint); //x: max y: max
+				}
+				digree_sum = digree_sum + digree;
+			}
+		}	
 	}
 }
